@@ -126,7 +126,12 @@ def train():
 
     # Setting up network
     num_classes = len(training_classes)
-    net = models.efficientnet_b0(num_classes=num_classes).cuda()
+
+    # Using pretrained weights for efficient net 0
+    net = models.efficientnet_b0(weights='IMAGENET1K_V1')
+    net.classifier[1] = torch.nn.Linear(in_features=1280, out_features=num_classes, bias=True)
+    net = net.cuda()
+
     optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
     criterion = torch.nn.CrossEntropyLoss()
     num_epoch = 500
@@ -142,7 +147,6 @@ def train():
     recall_metric = torchmetrics.classification.MulticlassRecall(num_classes=num_classes).cuda()
     precision_metric = torchmetrics.classification.MulticlassPrecision(num_classes=num_classes).cuda()
     auroc_metric = torchmetrics.classification.MulticlassAUROC(num_classes=num_classes).cuda()
-
 
     for i in range(num_epoch):
         epoch_loss = 0
@@ -162,7 +166,7 @@ def train():
 
             print("Epoch {}, Iteration {} of {}, Batch loss: {}".format(i+1, idx+1, num_batches, loss.item()))
             writer.add_scalar("Train/Loss", loss.item(), step)
-            batch_mean(acc_metric(torch.nn.functional.softmax(label_pred, dim=1).argmax(dim=1), label))
+            batch_mean(acc_metric(torch.nn.functional.softmax(label_pred, dim=1), label))
             step += 1
 
         train_acc = batch_mean.compute().item()
