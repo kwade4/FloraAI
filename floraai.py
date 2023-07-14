@@ -132,7 +132,9 @@ def train():
     net.classifier[1] = torch.nn.Linear(in_features=1280, out_features=num_classes, bias=True)
     net = net.cuda()
 
-    optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
+    optimizer = torch.optim.AdamW(net.parameters(), lr=5e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.95)
+
     criterion = torch.nn.CrossEntropyLoss()
     num_epoch = 500
     num_batches = len(train_loader)
@@ -142,6 +144,7 @@ def train():
     step = 1
 
     # Set up validation metrics
+    train_acc_metric = torchmetrics.classification.MulticlassAccuracy(num_classes=num_classes, average='micro').cuda()
     acc_metric = torchmetrics.classification.MulticlassAccuracy(num_classes=num_classes).cuda()
     f1_metric = torchmetrics.classification.MulticlassF1Score(num_classes=num_classes).cuda()
     recall_metric = torchmetrics.classification.MulticlassRecall(num_classes=num_classes).cuda()
@@ -151,6 +154,7 @@ def train():
     for i in range(num_epoch):
         epoch_loss = 0
         batch_mean = torchmetrics.aggregation.MeanMetric().cuda()
+        net.train()
         for idx, (images, label) in enumerate(train_loader):
             optimizer.zero_grad()
 
@@ -166,8 +170,10 @@ def train():
 
             print("Epoch {}, Iteration {} of {}, Batch loss: {}".format(i+1, idx+1, num_batches, loss.item()))
             writer.add_scalar("Train/Loss", loss.item(), step)
-            batch_mean(acc_metric(torch.nn.functional.softmax(label_pred, dim=1), label))
+            batch_mean(train_acc_metric(label_pred, label))
             step += 1
+
+        scheduler.step()
 
         train_acc = batch_mean.compute().item()
         writer.add_scalar("Train/Accuracy", train_acc, i+1)
@@ -175,6 +181,7 @@ def train():
         print('Finished Epoch {}, Training accuracy {}'.format(i+1, train_acc))
 
         # Calculate validation stats after every epoch
+        net.eval()
         with torch.no_grad():
 
             label_list = []
@@ -184,7 +191,7 @@ def train():
                 images = images.cuda()
                 label = label.cuda()
 
-                label_pred = torch.nn.functional.softmax(net(images), dim=1)
+                label_pred = net(images)
 
                 label_list.append(label)
                 pred_list.append(label_pred)
@@ -204,7 +211,7 @@ def train():
             writer.add_scalar('Validation/Precision', precision.item(), i + 1)
             writer.add_scalar('Validation/AUROC', auroc.item(), i + 1)
 
-    torch.save(net, os.path.join(writer.log_dir, 'model.pt'))
+        torch.save(net, os.path.join(writer.log_dir, 'model.pt'))
 
 
 if __name__ == "__main__":
