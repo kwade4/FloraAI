@@ -1,3 +1,8 @@
+"""
+Process and split data from the original Oxford 102 Flowers dataset
+into training, testing, and validation.
+"""
+
 import numpy as np
 import scipy.io as sio
 import pandas as pd
@@ -12,7 +17,7 @@ np.savetxt('data/labels.csv', labels.T, fmt='%i')
 
 if not Path('data/train.csv').exists():
     # Creating a dataframe with the image_id and corresponding label
-    data = pd.DataFrame({'image_id': range(1,8190), 'label': labels.squeeze()})
+    data = pd.DataFrame({'image_id': range(1, 8190), 'label': labels.squeeze()})
 
     # Create stratified sample for training, validation, testing
     train_df = data.groupby('label', group_keys=False).apply(lambda x: x.sample(frac=0.7))

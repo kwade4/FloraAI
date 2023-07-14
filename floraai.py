@@ -10,8 +10,8 @@ import torchmetrics
 import matplotlib.pyplot as plt
 import os
 
-TRAIN_PATH = '../data/train'
-VALIDATION_PATH = '../data/validation'
+TRAIN_PATH = 'data/train'
+VALIDATION_PATH = 'data/validation'
 
 
 def load_image_data(data_path):
@@ -133,10 +133,10 @@ def train():
     net = net.cuda()
 
     optimizer = torch.optim.AdamW(net.parameters(), lr=5e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.95)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.85)
 
     criterion = torch.nn.CrossEntropyLoss()
-    num_epoch = 500
+    num_epoch = 50
     num_batches = len(train_loader)
 
     # Set up tensorboard writer
@@ -150,6 +150,8 @@ def train():
     recall_metric = torchmetrics.classification.MulticlassRecall(num_classes=num_classes).cuda()
     precision_metric = torchmetrics.classification.MulticlassPrecision(num_classes=num_classes).cuda()
     auroc_metric = torchmetrics.classification.MulticlassAUROC(num_classes=num_classes).cuda()
+
+    max_accuracy = 0
 
     for i in range(num_epoch):
         epoch_loss = 0
@@ -211,7 +213,12 @@ def train():
             writer.add_scalar('Validation/Precision', precision.item(), i + 1)
             writer.add_scalar('Validation/AUROC', auroc.item(), i + 1)
 
-        torch.save(net, os.path.join(writer.log_dir, 'model.pt'))
+        # Save the model with the highest accuracy
+        if acc > max_accuracy:
+            max_accuracy = acc.item()
+            torch.save(net, os.path.join(writer.log_dir, 'model.pt'))
+
+    print("Highest Validation Accuracy: {}".format(max_accuracy))
 
 
 if __name__ == "__main__":
